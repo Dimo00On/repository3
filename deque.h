@@ -276,7 +276,7 @@ Deque<T>::Deque(const Deque<T>& copy) {
 template<typename T>
 Deque<T>::Deque(char zero, int newSize) {
     int x = 0;
-    if(zero == '0') {
+    if (zero == '0') {
         ++x;
     }
     if (newSize < 0) {
