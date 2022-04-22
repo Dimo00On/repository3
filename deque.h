@@ -6,14 +6,14 @@ const size_t kSize = 16;
 const int kIntSize = static_cast<int>(kSize);
 
 template<typename T>
-class Deque{
+class Deque {
 private:
-    std::vector<T*> mArray;
     size_t mBegin;
     size_t mBeginIndex;
     size_t mEnd;
     size_t mEndIndex;
     size_t mCapacity;
+    std::vector<T*> mArray;
 
 public:
     template<bool Const>
@@ -37,26 +37,14 @@ public:
         int mExternalIndex;
         T** mPtr;
 
-        friend void Deque<T>::erase(iterator it);
         friend void Deque<T>::insert(iterator it, const T& value);
 
     public:
-        Iterator(T** newPtr, size_t index, size_t start) {
-            mExternalIndex = static_cast<int>(start);
-            mInternalIndex = static_cast<int>(index);
-            mPtr = newPtr;
-        }
-        Iterator() noexcept {
-            mInternalIndex = 0;
-            mExternalIndex = 0;
-            mPtr = nullptr;
-        }
-        Iterator(const Iterator& other) noexcept {
-            mInternalIndex = other.mInternalIndex;
-            mExternalIndex = other.mExternalIndex;
-            mPtr = other.mPtr;
-        }
-
+        Iterator(T** newPtr, size_t index, size_t start) : mInternalIndex(static_cast<int>(index)),
+            mExternalIndex(static_cast<int>(start)), mPtr(newPtr) {}
+        Iterator() noexcept : mInternalIndex(0), mExternalIndex(0), mPtr(nullptr) {}
+        Iterator(const Iterator& other) noexcept : mInternalIndex(other.mInternalIndex),
+            mExternalIndex(other.mExternalIndex), mPtr(other.mPtr) {}
         operator Iterator<true>() const {
             return Iterator<true>(*this);
         }
@@ -74,45 +62,21 @@ public:
             return *this;
         }
         Iterator& operator++() noexcept {
-            if (mInternalIndex == kIntSize - 1) {
-                mInternalIndex = 0;
-                ++mPtr;
-                ++mExternalIndex;
-            } else {
-                ++mInternalIndex;
-            }
+            checkIndexPlus();
             return *this;
         }
         Iterator operator++(int) noexcept {
             Deque<T>::Iterator newIt(*this);
-            if (mInternalIndex == kIntSize - 1) {
-                mInternalIndex = 0;
-                ++mPtr;
-                ++mExternalIndex;
-            } else {
-                ++mInternalIndex;
-            }
+            checkIndexPlus();
             return newIt;
         }
         Iterator& operator--() noexcept {
-            if (mInternalIndex == 0) {
-                mInternalIndex = kIntSize - 1;
-                --mPtr;
-                --mExternalIndex;
-            } else {
-                --mInternalIndex;
-            }
+            checkIndexMinus();
             return *this;
         }
         Iterator operator--(int) noexcept {
             Deque<T>::Iterator newIt(*this);
-            if (mInternalIndex == 0) {
-                mInternalIndex = kIntSize - 1;
-                --mPtr;
-                --mExternalIndex;
-            } else {
-                --mInternalIndex;
-            }
+            checkIndexMinus();
             return newIt;
         }
         Iterator& operator+=(int shift) noexcept {
@@ -120,11 +84,7 @@ public:
             mPtr += mInternalIndex / kIntSize;
             mExternalIndex += mInternalIndex / kIntSize;
             mInternalIndex %= kIntSize;
-            if (mInternalIndex < 0) {
-                mInternalIndex += kIntSize;
-                --mPtr;
-                --mExternalIndex;
-            }
+            checkIndexShift();
             return *this;
         }
         Iterator operator+(int shift) const noexcept {
@@ -137,11 +97,7 @@ public:
             mPtr += mInternalIndex / kIntSize;
             mExternalIndex += mInternalIndex / kIntSize;
             mInternalIndex %= kIntSize;
-            if (mInternalIndex < 0) {
-                mInternalIndex += kIntSize;
-                --mPtr;
-                --mExternalIndex;
-            }
+            checkIndexShift();
             return *this;
         }
         Iterator operator-(int shift) const noexcept {
@@ -178,13 +134,38 @@ public:
         pointer operator->() const {
             return (*mPtr + mInternalIndex);
         }
+    private:
+        void checkIndexPlus() {
+            if (mInternalIndex == kIntSize - 1) {
+                mInternalIndex = 0;
+                ++mPtr;
+                ++mExternalIndex;
+            } else {
+                ++mInternalIndex;
+            }
+        }
+        void checkIndexMinus() {
+            if (mInternalIndex == 0) {
+                mInternalIndex = kIntSize - 1;
+                --mPtr;
+                --mExternalIndex;
+            } else {
+                --mInternalIndex;
+            }
+        }
+        void checkIndexShift() {
+            if (mInternalIndex < 0) {
+                mInternalIndex += kIntSize;
+                --mPtr;
+                --mExternalIndex;
+            }
+        }
     };
 
 public:
     ~Deque();
     Deque();
     Deque(const Deque<T>& copy);
-    Deque(char zero, int newSize);
     explicit Deque(int newSize);
     Deque(int newSize, const T& value);
 
@@ -218,6 +199,10 @@ public:
 private:
     void reserveFromClear(size_t capacity);
     void expand(size_t capacity);
+    void checkEndMinus();
+    void checkEndPlus();
+    void checkBeginMinus();
+    void checkBeginPlus();
 };
 
 template<typename T, bool Const>
@@ -236,21 +221,14 @@ Deque<T>::~Deque() {
 }
 
 template<typename T>
-Deque<T>::Deque() {
+Deque<T>::Deque() : mBegin(kSize / 2 - 1), mBeginIndex(kSize - 1), mEnd(kSize / 2), mEndIndex(0) {
     reserveFromClear(kSize);
-    mBegin = kSize / 2 - 1;
-    mEnd = kSize / 2;
-    mBeginIndex = kSize - 1;
-    mEndIndex = 0;
 }
 
 template<typename T>
-Deque<T>::Deque(const Deque<T>& copy) {
+Deque<T>::Deque(const Deque<T>& copy) : mBegin(copy.mBegin), mBeginIndex(copy.mBeginIndex),
+    mEnd(copy.mBegin), mEndIndex(copy.mBeginIndex + 1) {
     try {
-        mBegin = copy.mBegin;
-        mEnd = copy.mBegin;
-        mBeginIndex = copy.mBeginIndex;
-        mEndIndex = copy.mBeginIndex + 1;
         reserveFromClear(copy.mCapacity);
         for (size_t j = mBeginIndex + 1; j < kSize; ++j, ++mEndIndex) {
             new(mArray[mBegin] + j) T(copy.mArray[mBegin][j]);
@@ -274,25 +252,13 @@ Deque<T>::Deque(const Deque<T>& copy) {
 }
 
 template<typename T>
-Deque<T>::Deque(char zero, int newSize) {
-    int x = 0;
-    if(zero == '0') {
-        ++x;
-    }
+Deque<T>::Deque(int newSize, const T& value) {
     if (newSize < 0) {
-        throw std::runtime_error("oh");
+        throw std::runtime_error("bad size");
     } else {
         mCapacity = static_cast<size_t>(2 * std::max((newSize + kIntSize - 1) / kIntSize, kIntSize / 2));
         reserveFromClear(mCapacity);
-        mBegin = mCapacity / 2 - 1;
-        mEnd = mCapacity / 2;
-        mBeginIndex = kSize - 1;
-        mEndIndex = 0;
     }
-}
-
-template<typename T>
-Deque<T>::Deque(int newSize, const T& value) : Deque('0', newSize) {
     mBegin = (mCapacity - static_cast<size_t>(newSize) / kSize) / 2;
     mBeginIndex = kSize - 1;
     mEnd = mBegin + 1;
@@ -300,12 +266,7 @@ Deque<T>::Deque(int newSize, const T& value) : Deque('0', newSize) {
     try {
         for (int i = 1; i <= newSize; ++i) {
             new(mArray[mEnd] + mEndIndex)  T(value);
-            if (i % kIntSize == 0) {
-                mEndIndex = 0;
-                ++mEnd;
-            } else {
-                ++mEndIndex;
-            }
+            checkEndPlus();
         }
     }
     catch (...) {
@@ -512,24 +473,14 @@ void Deque<T>::expand(size_t capacity) {
 template<typename T>
 void Deque<T>::push_back(const T& value) {
     new(mArray[mEnd] + mEndIndex)  T(value);
-    if (mEndIndex == kSize - 1) {
-        ++mEnd;
-        mEndIndex = 0;
-    } else {
-        ++mEndIndex;
-    }
+    checkEndPlus();
     try {
         if (mEnd + 1 == mArray.size()) {
             expand(2 * mCapacity);
         }
     }
     catch(...) {
-        if (mEndIndex == 0) {
-            --mEnd;
-            mEndIndex = kSize - 1;
-        } else {
-            --mEndIndex;
-        }
+        checkEndMinus();
         (mArray[mEnd] + mEndIndex)->~T();
         throw;
     }
@@ -538,13 +489,9 @@ void Deque<T>::push_back(const T& value) {
 template<typename T>
 void Deque<T>::pop_back() {
     if (size() == 0) {
-        throw std::runtime_error("oh");
+        throw std::runtime_error("zero size");
     } else {
-        if (mEndIndex == 0) {
-            --mEnd;
-            mEndIndex = kSize;
-        }
-        --mEndIndex;
+        checkEndMinus();
         (mArray[mEnd] + mEndIndex)->~T();
     }
 }
@@ -552,24 +499,14 @@ void Deque<T>::pop_back() {
 template<typename T>
 void Deque<T>::push_front(const T& value) {
     new(mArray[mBegin] + mBeginIndex) T(value);
-    if (mBeginIndex == 0) {
-        --mBegin;
-        mBeginIndex = kSize - 1;
-    } else {
-        --mBeginIndex;
-    }
+    checkBeginMinus();
     if (mBegin <= 1) {
         try {
             expand(2 * mCapacity);
         }
         catch(...) {
             (mArray[mBegin] + mBeginIndex)->~T();
-            if (mBeginIndex == kSize - 1) {
-                ++mBegin;
-                mBeginIndex = 0;
-            } else {
-                ++mBeginIndex;
-            }
+            checkBeginPlus();
             throw;
         }
     }
@@ -578,14 +515,9 @@ void Deque<T>::push_front(const T& value) {
 template<typename T>
 void Deque<T>::pop_front() {
     if (size() == 0) {
-        throw std::runtime_error("oh");
+        throw std::runtime_error("zero size");
     } else {
-        if (mBeginIndex == kSize - 1) {
-            mBeginIndex = 0;
-            ++mBegin;
-        } else {
-            ++mBeginIndex;
-        }
+        checkBeginPlus();
         (mArray[mBegin] + mBeginIndex)->~T();
     }
 }
@@ -661,23 +593,31 @@ typename Deque<T>::reverse_const_iterator Deque<T>::crend() const noexcept {
 
 template<typename T>
 void Deque<T>::erase(iterator it) {
+    if (it == begin()) {
+        pop_front();
+        return;
+    }
     if (it + 1 == end()) {
         pop_back();
     } else {
+        int count = 0;
+        T backup = *it;
         try {
-            for (; it + 1 < end(); ++it) {
+            for (; it + 1 < end(); ++it, ++count) {
                 *it = *(it + 1);
             }
-            (*it.mPtr + it.mInternalIndex)->~T();
-            if (mEndIndex == 0) {
-                mEndIndex = kSize - 1;
-                --mEnd;
-            } else {
-                --mEndIndex;
-            }
+            it->~T();
+            checkEndMinus();
         }
         catch(...) {
-            //? если исключение из равенства?
+            if (count > 0) {
+                --it;
+                --count;
+                for (; count > 0; --it, --count) {
+                    *it = *(it - 1);
+                }
+                *it = backup;
+            }
             throw;
         }
     }
@@ -685,36 +625,60 @@ void Deque<T>::erase(iterator it) {
 
 template<typename T>
 void Deque<T>::insert(iterator it, const T &value) {
+    Deque<T> backup;
+    bool isExpanded = false;
+    bool isConstructedPoint = false;
+    size_t count = 0;
     if (mEnd + 1 == mArray.size()) {
+        backup = *this;
+        isExpanded = true;
         int lastBegin = static_cast<int>(mBegin);
         size_t capacity = 2 * std::max(mCapacity, kSize);
         expand(capacity);
         it.mExternalIndex += static_cast<int>((capacity - (mEnd - mBegin)) / 2) - lastBegin;
     }
     iterator start(it);
-    iterator next(it + 1);
     iterator endIt(end());
-    new(*endIt.mPtr + endIt.mInternalIndex) T(value);
-    if (it != endIt) {
-        T temp(value);
-        T temp1(*it);
-        size_t count = 0;
-        try {
-            for (; it + 1 < endIt; ++it) {
-                temp = *(it + 1);
-                *(it + 1) = temp1;
-                temp1 = temp;
-
-                ++count;
+    T* point = *endIt.mPtr + endIt.mInternalIndex;
+    T backStart(*start);
+    T temp(*it);
+    try {
+        new(point) T(value);
+        isConstructedPoint = true;
+        if (it != endIt) {
+            for (; it + 1 <= endIt; ++it, ++count) {
+                std::swap(temp, *(it + 1));
             }
-            *endIt = temp1;
             *start = value;
         }
-        catch (...) {
-            //? если исключение из равенства?
-            throw;
-        }
     }
+    catch (...) {
+        for (; count > 0; --it, --count) {
+            std::swap(temp, *it);
+        }
+        if (isConstructedPoint) {
+            point->~T();
+        }
+        if (isExpanded) {
+            *this = backup;
+        }
+        throw;
+    }
+    checkEndPlus();
+}
+
+template<typename T>
+void Deque<T>::checkEndMinus() {
+    if (mEndIndex == 0) {
+        mEndIndex = kSize - 1;
+        --mEnd;
+    } else {
+        --mEndIndex;
+    }
+}
+
+template<typename T>
+void Deque<T>::checkEndPlus() {
     if (mEndIndex == kSize - 1) {
         mEndIndex = 0;
         ++mEnd;
@@ -723,3 +687,22 @@ void Deque<T>::insert(iterator it, const T &value) {
     }
 }
 
+template<typename T>
+void Deque<T>::checkBeginPlus() {
+    if (mBeginIndex == kSize - 1) {
+        mBeginIndex = 0;
+        ++mBegin;
+    } else {
+        ++mBeginIndex;
+    }
+}
+
+template<typename T>
+void Deque<T>::checkBeginMinus() {
+    if (mBeginIndex == 0) {
+        --mBegin;
+        mBeginIndex = kSize - 1;
+    } else {
+        --mBeginIndex;
+    }
+}
