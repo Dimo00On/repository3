@@ -128,7 +128,7 @@ private:
         }
     };
 
-    class Node: public BaseNode{
+    class Node : public BaseNode {
     public:
         T mValue;
 
