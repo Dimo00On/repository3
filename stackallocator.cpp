@@ -113,7 +113,7 @@ StackAllocator<T, N> StackAllocator<T, N>::select_on_container_copy_construction
 }
 
 template<typename T, typename Alloc = std::allocator<T>>
-class List{
+class List {
 private:
     class BaseNode{
     public:
