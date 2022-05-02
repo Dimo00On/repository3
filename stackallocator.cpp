@@ -1,6 +1,6 @@
 #include <iostream>
 #include <exception>
-
+#include <cassert>
 
 template<size_t N>
 class StackStorage{
@@ -100,12 +100,7 @@ T* StackAllocator<T, N>::allocate(size_t amount) {
 }
 
 template<typename T, size_t N>
-void StackAllocator<T, N>::deallocate(T* ptr, size_t amount) {
-    T* veryUsefulForCodeStyleSystemCheckPtr = ptr;
-    ++veryUsefulForCodeStyleSystemCheckPtr;
-    size_t veryUsefulForCodeStyleSystemCheckSize = amount;
-    ++veryUsefulForCodeStyleSystemCheckSize;
-}
+void StackAllocator<T, N>::deallocate(T*, size_t) {}
 
 template<typename T, size_t N>
 StackAllocator<T, N> StackAllocator<T, N>::select_on_container_copy_construction() {
@@ -113,9 +108,9 @@ StackAllocator<T, N> StackAllocator<T, N>::select_on_container_copy_construction
 }
 
 template<typename T, typename Alloc = std::allocator<T>>
-class List{
+class List {
 private:
-    class BaseNode{
+    class BaseNode {
     public:
         BaseNode* next;
         BaseNode* prev;
@@ -128,7 +123,7 @@ private:
         }
     };
 
-    class Node: public BaseNode{
+    class Node : public BaseNode {
     public:
         T mValue;
 
@@ -144,7 +139,7 @@ private:
     using AssignSelectAlloc = typename std::allocator_traits<Alloc>::propagate_on_container_copy_assignment;
 
 private:
-    Alloc getAlloc;
+    Alloc mAllocForGetAllocator;
     Allocator mAlloc;
     size_t mSize;
     BaseNode* mFakeNode;
@@ -158,6 +153,7 @@ public:
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     explicit List(const Alloc& alloc  = Alloc());
+    List(int amount, const Alloc& alloc, const T* valuePtr, bool isDefaultValue);
     List(int amount, const Alloc& alloc = Alloc());
     List(int amount, const T& value, const Alloc& alloc = Alloc());
     Alloc get_allocator() noexcept;
@@ -302,9 +298,7 @@ public:
         }
 
         difference_type operator-(const Iterator &other) const noexcept {
-            if (other.mEnd != mEnd) {
-                return static_cast<difference_type>('w' + 'h' + 'a' + 't');
-            }
+            assert(other.mEnd != mEnd);
             if (*this == other) {
                 return static_cast<difference_type>(0);
             }
@@ -345,7 +339,7 @@ public:
 
 template<typename T, typename Alloc>
 Alloc List<T, Alloc>::get_allocator() noexcept {
-    return getAlloc;
+    return mAllocForGetAllocator;
 }
 
 template<typename T, typename Alloc>
@@ -409,7 +403,7 @@ typename List<T, Alloc>::const_reverse_iterator List<T, Alloc>::crend() const no
 }
 
 template<typename T, typename Alloc>
-List<T, Alloc>::List(const Alloc& alloc): getAlloc(alloc), mAlloc(Allocator(alloc)), mSize(0) {
+List<T, Alloc>::List(const Alloc& alloc): mAllocForGetAllocator(alloc), mAlloc(Allocator(alloc)), mSize(0) {
     BaseAllocator baseAllocator(mAlloc);
     mFakeNode = BaseAllocTraits::allocate(baseAllocator, 1);
     try {
@@ -421,9 +415,8 @@ List<T, Alloc>::List(const Alloc& alloc): getAlloc(alloc), mAlloc(Allocator(allo
         throw;
     }
 }
-
 template<typename T, typename Alloc>
-List<T, Alloc>::List(int amount, const Alloc& alloc): List(alloc) {
+List<T, Alloc>::List(int amount, const Alloc& alloc, const T* valuePtr, bool isDefaultValue) : List(alloc) {
     int count;
     BaseNode* previous = mFakeNode;
     bool isAllocated = false;
@@ -432,7 +425,12 @@ List<T, Alloc>::List(int amount, const Alloc& alloc): List(alloc) {
         for (count = 0; count < amount; ++count) {
             newNode = AllocTraits::allocate(mAlloc, 1);
             isAllocated = true;
-            AllocTraits::construct(mAlloc, newNode);
+            if (isDefaultValue) {
+                AllocTraits::construct(mAlloc, newNode);
+            }
+            else {
+                AllocTraits::construct(mAlloc, newNode, *valuePtr);
+            }
             previous->next = newNode;
             newNode->prev = previous;
             previous = newNode;
@@ -457,42 +455,14 @@ List<T, Alloc>::List(int amount, const Alloc& alloc): List(alloc) {
 }
 
 template<typename T, typename Alloc>
-List<T, Alloc>::List(int amount, const T& value, const Alloc& alloc): List(alloc) {
-    int count;
-    BaseNode* previous = mFakeNode;
-    bool isAllocated = false;
-    Node* newNode = nullptr;
-    try {
-        for (count = 0; count < amount; ++count) {
-            newNode = AllocTraits::allocate(mAlloc, 1);
-            isAllocated = true;
-            AllocTraits::construct(mAlloc, newNode, value);
-            previous->next = newNode;
-            newNode->prev = previous;
-            previous = newNode;
-            isAllocated = false;
-        }
-        newNode->next = mFakeNode;
-        mFakeNode->prev = newNode;
-    }
-    catch(...) {
-        if (isAllocated) {
-            AllocTraits::deallocate(mAlloc, newNode, 1);
-        }
-        for (int i = 0; i < count; ++i) {
-            newNode = dynamic_cast<Node*>(previous);
-            previous = newNode->prev;
-            AllocTraits::destroy(mAlloc, newNode);
-            AllocTraits::deallocate(mAlloc, newNode);
-        }
-        throw;
-    }
-    mSize = amount;
-}
+List<T, Alloc>::List(int amount, const Alloc& alloc): List(amount, alloc, nullptr, true) {}
+
+template<typename T, typename Alloc>
+List<T, Alloc>::List(int amount, const T& value, const Alloc& alloc): List(amount, alloc, &value, false) {}
 
 template<typename T, typename Alloc>
 List<T, Alloc>::List(const List<T, Alloc>& other):
-        List(std::allocator_traits<Alloc>::select_on_container_copy_construction(other.getAlloc)) {
+        List(std::allocator_traits<Alloc>::select_on_container_copy_construction(other.mAllocForGetAllocator)) {
     size_t count;
     BaseNode* previous = mFakeNode;
     BaseNode* otherNode = other.mFakeNode->next;
@@ -529,15 +499,15 @@ List<T, Alloc>::List(const List<T, Alloc>& other):
 
 template<typename T, typename Alloc>
 List<T, Alloc>& List<T, Alloc>::operator=(const List<T, Alloc>& other) {
-    Alloc copyGetAlloc = getAlloc;
+    Alloc copyGetAlloc = mAllocForGetAllocator;
     Allocator copyAlloc = mAlloc;
     if (AssignSelectAlloc::value) {
         mAlloc = other.mAlloc;
-        getAlloc = other.getAlloc;
+        mAllocForGetAllocator = other.mAllocForGetAllocator;
     } else {
-        if (getAlloc != other.getAlloc) {
+        if (mAllocForGetAllocator != other.mAllocForGetAllocator) {
             mAlloc = std::allocator_traits<Allocator>::select_on_container_copy_construction(other.mAlloc);
-            getAlloc = std::allocator_traits<Alloc>::select_on_container_copy_construction(other.getAlloc);
+            mAllocForGetAllocator = std::allocator_traits<Alloc>::select_on_container_copy_construction(other.mAllocForGetAllocator);
         }
     }
     if (this == &other) {
@@ -552,7 +522,7 @@ List<T, Alloc>& List<T, Alloc>::operator=(const List<T, Alloc>& other) {
     }
     catch(...) {
         mAlloc = copyAlloc;
-        getAlloc = copyGetAlloc;
+        mAllocForGetAllocator = copyGetAlloc;
         BaseAllocTraits::deallocate(baseAllocator, newFake, 1);
         throw;
     }
@@ -589,7 +559,7 @@ List<T, Alloc>& List<T, Alloc>::operator=(const List<T, Alloc>& other) {
         BaseAllocTraits::destroy(baseAllocator, mFakeNode);
         BaseAllocTraits::deallocate(baseAllocator, mFakeNode, 1);
         mAlloc = copyAlloc;
-        getAlloc = copyGetAlloc;
+        mAllocForGetAllocator = copyGetAlloc;
         mFakeNode = copy;
         throw;
     }
