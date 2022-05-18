@@ -222,7 +222,7 @@ public:
             return newIt;
         }
 
-        Iterator &operator--() noexcept {
+        Iterator& operator--() noexcept {
             mNode = mNode->prev;
             return *this;
         }
@@ -233,7 +233,7 @@ public:
             return newIt;
         }
 
-        Iterator &operator+=(int shift) noexcept {
+        Iterator& operator+=(int shift) noexcept {
             if (shift > 0) {
                 for (int i = 0; i < shift; ++i) {
                     mNode = mNode->next;
@@ -252,7 +252,7 @@ public:
             return newIt;
         }
 
-        Iterator &operator-=(int shift) noexcept {
+        Iterator& operator-=(int shift) noexcept {
             *this += -shift;
             return *this;
         }
@@ -263,7 +263,7 @@ public:
             return newIt;
         }
 
-        bool operator<(const Iterator &other) const noexcept {
+        bool operator<(const Iterator& other) const noexcept {
             if (mEnd != other.mEnd) {
                 return false;
             }
@@ -277,27 +277,27 @@ public:
             return false;
         }
 
-        bool operator<=(const Iterator &other) const noexcept {
+        bool operator<=(const Iterator& other) const noexcept {
             return (*this == other || *this < other);
         }
 
-        bool operator>(const Iterator &other) const noexcept {
+        bool operator>(const Iterator& other) const noexcept {
             return other < *this;
         }
 
-        bool operator>=(const Iterator &other) const noexcept {
+        bool operator>=(const Iterator& other) const noexcept {
             return (other == *this || other < *this);
         }
 
-        bool operator==(const Iterator &other) const noexcept {
+        bool operator==(const Iterator& other) const noexcept {
             return (mNode == other.getNode());
         }
 
-        bool operator!=(const Iterator &other) const noexcept {
+        bool operator!=(const Iterator& other) const noexcept {
             return !(*this == other);
         }
 
-        difference_type operator-(const Iterator &other) const noexcept {
+        difference_type operator-(const Iterator& other) const noexcept {
             assert(other.mEnd != mEnd);
             if (*this == other) {
                 return static_cast<difference_type>(0);
@@ -695,8 +695,8 @@ void List<T, Alloc>::erase(Iterator<Const> it) noexcept {
     }
     BaseNode *next = it.getNode()->next;
     BaseNode *prev = it.getNode()->prev;
-    AllocTraits::destroy(mAlloc, dynamic_cast<Node *>(it.getNode()));
-    AllocTraits::deallocate(mAlloc, dynamic_cast<Node *>(it.getNode()), 1);
+    AllocTraits::destroy(mAlloc, dynamic_cast<Node*>(it.getNode()));
+    AllocTraits::deallocate(mAlloc, dynamic_cast<Node*>(it.getNode()), 1);
     prev->next = next;
     next->prev = prev;
     --mSize;
